@@ -1,14 +1,7 @@
 package org.apache.rocketmq.tieredstore.provider.oss;
 
 import com.aliyun.oss.OSS;
-import com.aliyun.oss.model.AppendObjectRequest;
-import com.aliyun.oss.model.AppendObjectResult;
-import com.aliyun.oss.model.PutObjectRequest;
-import com.aliyun.oss.model.PutObjectResult;
-import com.aliyun.oss.model.ObjectMetadata;
-import com.aliyun.oss.model.SimplifiedObjectMeta;
-import com.aliyun.oss.model.GetObjectRequest;
-import com.aliyun.oss.model.OSSObject;
+import com.aliyun.oss.model.*;
 import com.aliyuncs.exceptions.ClientException;
 import org.apache.rocketmq.tieredstore.provider.ClientInstance;
 
@@ -16,9 +9,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class OssAccess {
     private final boolean enableClientPool;
@@ -34,8 +33,66 @@ public class OssAccess {
         }
     }
 
-    public int getSize(String bucketName, String objectName) throws InterruptedException,
-            com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+    private Object internalCall(Method method, Object... args) throws ClientException, InterruptedException, InvocationTargetException, IllegalAccessException {
+        Object result;
+        if (enableClientPool) {
+            ClientInstance<OSS> clientInstance = clientPool.getClient();
+            result = method.invoke(clientInstance.getClient(), args);
+            clientPool.returnClient(clientInstance.getIndex());
+        } else {
+            result = method.invoke(client, args);
+        }
+        return result;
+    }
+
+    public void createBucket(String bucketName) throws ClientException, InterruptedException {
+        if (enableClientPool) {
+            ClientInstance<OSS> clientInstance = clientPool.getClient();
+            clientInstance.getClient().createBucket(bucketName);
+            clientPool.returnClient(clientInstance.getIndex());
+        } else {
+            client.createBucket(bucketName);
+        }
+    }
+
+    public boolean isBucketExist(String bucketName) throws ClientException, InterruptedException {
+        if (enableClientPool) {
+            ClientInstance<OSS> clientInstance = clientPool.getClient();
+            boolean exist = clientInstance.getClient().doesBucketExist(bucketName);
+            clientPool.returnClient(clientInstance.getIndex());
+            return exist;
+        } else {
+            return client.doesBucketExist(bucketName);
+        }
+    }
+
+    public List<Bucket> listAllBuckets() throws ClientException, InterruptedException {
+        if (enableClientPool) {
+            ClientInstance<OSS> clientInstance = clientPool.getClient();
+            List<Bucket> bucketList = clientInstance.getClient().listBuckets();
+            clientPool.returnClient(clientInstance.getIndex());
+            return bucketList;
+        } else {
+            return client.listBuckets();
+        }
+    }
+
+    public List<OSSObjectSummary> listObjects(String bucketName) throws ClientException, InterruptedException {
+        ObjectListing objectListing;
+        if (enableClientPool) {
+            ClientInstance<OSS> clientInstance = clientPool.getClient();
+            objectListing = clientInstance.getClient().listObjects(bucketName);
+            clientPool.returnClient(clientInstance.getIndex());
+        } else {
+            objectListing = client.listObjects(bucketName);
+        }
+        if (objectListing != null) {
+            return objectListing.getObjectSummaries();
+        }
+        return new ArrayList<>();
+    }
+
+    public Integer getSize(String bucketName, String objectName) throws InterruptedException, ClientException {
         SimplifiedObjectMeta meta;
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
@@ -44,35 +101,36 @@ public class OssAccess {
         } else {
             meta = client.getSimplifiedObjectMeta(bucketName, objectName);
         }
-
-        return (int) meta.getSize();
+        if (meta != null) {
+            return Math.toIntExact(meta.getSize());
+        }
+        return -1;
     }
 
-    public boolean isObjectExist(String bucketName, String objectName) throws InterruptedException,
-            com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
-        boolean exist = false;
+    public boolean isObjectExist(String bucketName, String objectName)
+            throws InterruptedException, ClientException {
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
-            exist = clientInstance.getClient().doesObjectExist(bucketName, objectName);
+            boolean exist = clientInstance.getClient().doesObjectExist(bucketName, objectName);
             clientPool.returnClient(clientInstance.getIndex());
+            return exist;
         } else {
-            exist = client.doesObjectExist(bucketName, objectName);
+            return client.doesObjectExist(bucketName, objectName);
         }
-        return exist;
     }
 
     public ByteBuffer getWholeObject(String bucketName, String objectName) throws IOException,
-            InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+            InterruptedException, ClientException {
         int size = getSize(bucketName, objectName);
         return getRangeObject(bucketName, objectName, 0, size);
     }
 
     public ByteBuffer getRangeObject(String bucketName, String objectName, long offset, int size) throws IOException,
-            InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
-        OSSObject result;
+            InterruptedException, ClientException {
         GetObjectRequest request = new GetObjectRequest(bucketName, objectName);
         request.setRange(offset, offset + size - 1);
 
+        OSSObject result;
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
             result = clientInstance.getClient().getObject(request);
@@ -93,7 +151,8 @@ public class OssAccess {
         return ByteBuffer.wrap(buf);
     }
 
-    public AppendObjectResult appendObject(InputStream inputStream, String bucketName, String objectName) throws InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+    public AppendObjectResult appendObject(InputStream inputStream, String bucketName, String objectName)
+            throws InterruptedException, ClientException{
         if (!isObjectExist(bucketName, objectName)) {
             return appendObject(inputStream, bucketName, objectName, 0);
         }
@@ -102,7 +161,7 @@ public class OssAccess {
     }
 
     public AppendObjectResult appendObject(InputStream inputStream, String bucketName, String objectName,
-            long offset) throws InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+            long offset) throws InterruptedException, ClientException {
         ObjectMetadata meta = new ObjectMetadata();
         // 指定上传的内容类型。
         meta.setContentType("text/plain");
@@ -110,39 +169,33 @@ public class OssAccess {
         AppendObjectRequest request = new AppendObjectRequest(bucketName, objectName, inputStream ,meta);
         // 设置文件的追加位置。
         request.setPosition(offset);
-        AppendObjectResult result;
 
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
-            result = clientInstance.getClient().appendObject(request);
+            AppendObjectResult result = clientInstance.getClient().appendObject(request);
             clientPool.returnClient(clientInstance.getIndex());
+            return result;
         } else {
-            result = client.appendObject(request);
+            return client.appendObject(request);
         }
-
-        return result;
     }
 
     public PutObjectResult putObject(InputStream inputStream, String bucketName,
-            String objectName) throws InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+            String objectName) throws InterruptedException, ClientException{
         // 创建PutObjectRequest对象。
         PutObjectRequest request = new PutObjectRequest(bucketName, objectName, inputStream);
-        PutObjectResult result;
-
-        // 上传字符串。
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
-            result = clientInstance.getClient().putObject(request);
+            PutObjectResult result = clientInstance.getClient().putObject(request);
             clientPool.returnClient(clientInstance.getIndex());
+            return result;
         } else {
-            result = client.putObject(request);
+            return client.putObject(request);
         }
-
-        return result;
     }
 
     public void deleteObject(String bucketName, String objectName)
-        throws InterruptedException, com.aliyun.oss.ClientException, com.aliyuncs.exceptions.ClientException {
+            throws InterruptedException, ClientException {
         if (enableClientPool) {
             ClientInstance<OSS> clientInstance = clientPool.getClient();
             clientInstance.getClient().deleteObject(bucketName, objectName);

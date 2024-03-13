@@ -6,8 +6,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.InvocationTargetException;
 
 public class OssClientPoolTest {
+    private final String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
     @Before
     public void setUp() throws ClientException, InterruptedException, NoSuchFieldException, IllegalAccessException {
         OssUtil.init(OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value);
@@ -15,6 +17,15 @@ public class OssClientPoolTest {
 
     @After
     public void tearDown() {
+    }
+
+    @Test
+    public void miCmpTest() throws ClientException, InterruptedException, InvocationTargetException, NoSuchMethodException, IllegalAccessException {
+        OssAccess access = new OssAccess(false, 1, OssConstant.oss_endpoint_beijing);
+        String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
+
+
+        access.shutdown();
     }
 
     @Test
@@ -35,7 +46,16 @@ public class OssClientPoolTest {
         concurrentTask(access, data, Integer.toString(poolSize));
         end = System.currentTimeMillis();
         System.out.println(poolSize + " clients time cost: " + (end - begin) + "ms");
+        truncateAll(access, Integer.toString(poolSize));
+        access.listObjects(bucketName).forEach(ossObjectSummary -> System.out.println(ossObjectSummary.getKey()));
         access.shutdown();
+    }
+
+    private void truncateAll(OssAccess access, String dir) throws ClientException, InterruptedException {
+        for (int i = 0; i < 20; ++i) {
+            access.deleteObject(bucketName, "rocketmq/consumeQueue/" + dir + "/" + i);
+            access.deleteObject(bucketName, "rocketmq/commitLog/" + dir + "/" + i);
+        }
     }
 
     private void concurrentTask(OssAccess access, String data, String dir) throws InterruptedException {
@@ -44,14 +64,14 @@ public class OssClientPoolTest {
             int finalI = i;
             Runnable cqTask = () -> {
                 try {
-                    access.appendObject(new ByteArrayInputStream(data.getBytes()), "rocketmq-tiered-test", "rocketmq/consumeQueue/" + dir + "/" + finalI);
+                    access.appendObject(new ByteArrayInputStream(data.getBytes()), bucketName, "rocketmq/consumeQueue/" + dir + "/" + finalI);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             };
             Runnable commitLogTask = () -> {
                 try {
-                    access.appendObject(new ByteArrayInputStream(data.getBytes()), "rocketmq-tiered-test", "rocketmq/commitLog/" + dir + "/" + finalI);
+                    access.appendObject(new ByteArrayInputStream(data.getBytes()), bucketName, "rocketmq/commitLog/" + dir + "/" + finalI);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

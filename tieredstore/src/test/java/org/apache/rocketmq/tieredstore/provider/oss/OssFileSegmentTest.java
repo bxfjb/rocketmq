@@ -17,7 +17,7 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 
 public class OssFileSegmentTest {
-    private final String bucketName = OssConstant.oss_bucket_name_default;
+    private final String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
     private final String endpoint = OssConstant.oss_endpoint_beijing;
     private TieredMessageStoreConfig storeConfig;
     private OssConfig ossConfig;
