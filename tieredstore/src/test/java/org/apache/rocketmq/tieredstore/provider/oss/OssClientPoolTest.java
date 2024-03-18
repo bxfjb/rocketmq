@@ -10,9 +10,16 @@ import java.lang.reflect.InvocationTargetException;
 
 public class OssClientPoolTest {
     private final String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
+    private OssConfig ossConfig;
     @Before
     public void setUp() throws ClientException, InterruptedException, NoSuchFieldException, IllegalAccessException {
-        OssUtil.init(OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value);
+        ossConfig = new OssConfig(
+                OssConstant.oss_xiaomi_cmp_test_bucket,
+                OssConstant.oss_endpoint_beijing,
+                OssConstant.oss_access_key_id_value,
+                OssConstant.oss_access_key_secret_value,
+                1);
+        OssUtil.init(ossConfig);
     }
 
     @After
@@ -21,25 +28,24 @@ public class OssClientPoolTest {
 
     @Test
     public void miCmpTest() throws ClientException, InterruptedException, InvocationTargetException, NoSuchMethodException, IllegalAccessException {
-        OssAccess access = new OssAccess(false, 1, OssConstant.oss_endpoint_beijing);
-        String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
-
+        OssAccess access = OssAccess.getInstance(ossConfig);
 
         access.shutdown();
     }
 
     @Test
     public void performanceTest() throws Exception {
-        concurrentTest(false, 0);
-        concurrentTest(true, 3);
-        concurrentTest(true, 5);
-        concurrentTest(true, 10);
-        concurrentTest(true, 20);
-        concurrentTest(true, 40);
+        concurrentTest(1);
+        concurrentTest(3);
+        concurrentTest(5);
+        concurrentTest(10);
+        concurrentTest(20);
+        concurrentTest(40);
     }
 
-    public void concurrentTest(boolean enablePool, int poolSize) throws InterruptedException, ClientException {
-        OssAccess access = new OssAccess(enablePool, poolSize, OssConstant.oss_endpoint_beijing);
+    public void concurrentTest(int poolSize) throws InterruptedException, ClientException {
+        ossConfig.setClientPoolSize(poolSize);
+        OssAccess access = OssAccess.getInstance(ossConfig);
         long begin, end;
         begin = System.currentTimeMillis();
         String data = poolSize + "!";

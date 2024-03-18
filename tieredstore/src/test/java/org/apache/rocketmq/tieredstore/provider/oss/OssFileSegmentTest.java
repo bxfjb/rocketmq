@@ -29,11 +29,12 @@ public class OssFileSegmentTest {
         storeConfig = new TieredMessageStoreConfig();
         mq = new MessageQueue("OSSFileSegmentTestTopic1", "broker", 0);
         TieredStoreExecutor.init();
+        ossConfig = new OssConfig(bucketName, endpoint, OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value, 1);
+        OssUtil.init(ossConfig);
     }
 
     @Test
     public void appendAndReadTest() throws ClientException, NoSuchFieldException, IllegalAccessException, InterruptedException {
-        ossConfig = new OssConfig(bucketName, endpoint, OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value, 0, false);
         ossFileSegment = new OssFileSegment(
                 storeConfig, ossConfig, FileSegmentType.CONSUME_QUEUE, TieredStoreUtil.toPath(mq), 0);
         byte[] source = new byte[4096];
@@ -57,7 +58,6 @@ public class OssFileSegmentTest {
 
     @Test
     public void putAndReadTest() throws ClientException, NoSuchFieldException, IllegalAccessException {
-        ossConfig = new OssConfig(bucketName, endpoint, OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value, 0, false);
         ossFileSegment = new OssFileSegment(
                 storeConfig, ossConfig, FileSegmentType.INDEX, TieredStoreUtil.toPath(mq), 0);
         byte[] source = new byte[4096];

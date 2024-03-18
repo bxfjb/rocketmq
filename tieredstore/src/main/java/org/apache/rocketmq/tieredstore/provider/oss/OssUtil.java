@@ -14,11 +14,11 @@ public class OssUtil {
     private static boolean init = false;
     private static EnvironmentVariableCredentialsProvider credentialsProvider;
 
-    public static void init(String keyId, String keySecret) throws NoSuchFieldException, IllegalAccessException, ClientException {
+    public static void init(OssConfig config) throws NoSuchFieldException, IllegalAccessException, ClientException {
         if (!init) {
             // 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
-            OssUtil.setEnv(OssConstant.oss_access_key_id_name, keyId);
-            OssUtil.setEnv(OssConstant.oss_access_key_secret_name, keySecret);
+            OssUtil.setEnv(OssConstant.oss_access_key_id_name, config.getKeyId());
+            OssUtil.setEnv(OssConstant.oss_access_key_secret_name, config.getKeySecret());
             init = true;
         }
         credentialsProvider = CredentialsProviderFactory.newEnvironmentVariableCredentialsProvider();

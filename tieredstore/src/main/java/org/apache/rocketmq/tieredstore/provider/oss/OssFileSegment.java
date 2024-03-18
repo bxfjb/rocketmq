@@ -38,8 +38,7 @@ public class OssFileSegment extends TieredFileSegment {
         this.objectName = Paths.get("rocketmq/" + storeConfig.getBrokerClusterName(), filePath, fileType.toString(),
                 TieredStoreUtil.offset2FileName(baseOffset)).toString();
         this.bucketName = ossConfig.getBucketName();
-        this.access = new OssAccess(ossConfig.isEnableClientPool(), ossConfig.getClientPoolSize(), ossConfig.getEndpoint());
-        OssUtil.init(ossConfig.getKeyId(), ossConfig.getKeySecret());
+        this.access = OssAccess.getInstance(ossConfig);
     }
 
     @Override

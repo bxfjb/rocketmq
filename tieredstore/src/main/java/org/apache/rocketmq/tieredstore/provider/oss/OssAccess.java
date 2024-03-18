@@ -20,72 +20,38 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class OssAccess {
-    private final boolean enableClientPool;
-    private OssClientPool clientPool;
-    private OSS client;
+    private static OssAccess access;
+    private final OssClientPool clientPool;
 
-    public OssAccess(boolean enableClientPool, int clientPoolSize, String endpoint) throws ClientException {
-        this.enableClientPool = enableClientPool;
-        if (enableClientPool) {
-            clientPool = new OssClientPool(clientPoolSize, endpoint);
-        } else {
-            client = OssUtil.buildOssClient(endpoint);
+    public static OssAccess getInstance(OssConfig ossConfig) throws ClientException {
+        if (access == null) {
+            access = new OssAccess(ossConfig.getClientPoolSize(), ossConfig.getEndpoint());
         }
+        return access;
     }
 
-    private Object internalCall(Method method, Object... args) throws ClientException, InterruptedException, InvocationTargetException, IllegalAccessException {
-        Object result;
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            result = method.invoke(clientInstance.getClient(), args);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            result = method.invoke(client, args);
-        }
-        return result;
+    private OssAccess(int clientPoolSize, String endpoint) throws ClientException {
+        clientPool = new OssClientPool(clientPoolSize, endpoint);
+    }
+
+    private OSS getClient() throws ClientException, InterruptedException {
+        return clientPool.getClient();
     }
 
     public void createBucket(String bucketName) throws ClientException, InterruptedException {
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            clientInstance.getClient().createBucket(bucketName);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            client.createBucket(bucketName);
-        }
+        getClient().createBucket(bucketName);
     }
 
     public boolean isBucketExist(String bucketName) throws ClientException, InterruptedException {
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            boolean exist = clientInstance.getClient().doesBucketExist(bucketName);
-            clientPool.returnClient(clientInstance.getIndex());
-            return exist;
-        } else {
-            return client.doesBucketExist(bucketName);
-        }
+        return getClient().doesBucketExist(bucketName);
     }
 
     public List<Bucket> listAllBuckets() throws ClientException, InterruptedException {
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            List<Bucket> bucketList = clientInstance.getClient().listBuckets();
-            clientPool.returnClient(clientInstance.getIndex());
-            return bucketList;
-        } else {
-            return client.listBuckets();
-        }
+        return getClient().listBuckets();
     }
 
     public List<OSSObjectSummary> listObjects(String bucketName) throws ClientException, InterruptedException {
-        ObjectListing objectListing;
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            objectListing = clientInstance.getClient().listObjects(bucketName);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            objectListing = client.listObjects(bucketName);
-        }
+        ObjectListing objectListing = getClient().listObjects(bucketName);
         if (objectListing != null) {
             return objectListing.getObjectSummaries();
         }
@@ -93,14 +59,7 @@ public class OssAccess {
     }
 
     public Integer getSize(String bucketName, String objectName) throws InterruptedException, ClientException {
-        SimplifiedObjectMeta meta;
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            meta = clientInstance.getClient().getSimplifiedObjectMeta(bucketName, objectName);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            meta = client.getSimplifiedObjectMeta(bucketName, objectName);
-        }
+        SimplifiedObjectMeta meta = getClient().getSimplifiedObjectMeta(bucketName, objectName);
         if (meta != null) {
             return Math.toIntExact(meta.getSize());
         }
@@ -109,14 +68,7 @@ public class OssAccess {
 
     public boolean isObjectExist(String bucketName, String objectName)
             throws InterruptedException, ClientException {
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            boolean exist = clientInstance.getClient().doesObjectExist(bucketName, objectName);
-            clientPool.returnClient(clientInstance.getIndex());
-            return exist;
-        } else {
-            return client.doesObjectExist(bucketName, objectName);
-        }
+        return getClient().doesObjectExist(bucketName, objectName);
     }
 
     public ByteBuffer getWholeObject(String bucketName, String objectName) throws IOException,
@@ -130,14 +82,7 @@ public class OssAccess {
         GetObjectRequest request = new GetObjectRequest(bucketName, objectName);
         request.setRange(offset, offset + size - 1);
 
-        OSSObject result;
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            result = clientInstance.getClient().getObject(request);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            result = client.getObject(request);
-        }
+        OSSObject result = getClient().getObject(request);
 
         byte[] buf = new byte[size];
         int off = 0;
@@ -169,47 +114,24 @@ public class OssAccess {
         AppendObjectRequest request = new AppendObjectRequest(bucketName, objectName, inputStream ,meta);
         // 设置文件的追加位置。
         request.setPosition(offset);
-
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            AppendObjectResult result = clientInstance.getClient().appendObject(request);
-            clientPool.returnClient(clientInstance.getIndex());
-            return result;
-        } else {
-            return client.appendObject(request);
-        }
+        OSS client = getClient();
+        return client.appendObject(request);
     }
 
     public PutObjectResult putObject(InputStream inputStream, String bucketName,
             String objectName) throws InterruptedException, ClientException{
         // 创建PutObjectRequest对象。
         PutObjectRequest request = new PutObjectRequest(bucketName, objectName, inputStream);
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            PutObjectResult result = clientInstance.getClient().putObject(request);
-            clientPool.returnClient(clientInstance.getIndex());
-            return result;
-        } else {
-            return client.putObject(request);
-        }
+        return getClient().putObject(request);
     }
 
     public void deleteObject(String bucketName, String objectName)
             throws InterruptedException, ClientException {
-        if (enableClientPool) {
-            ClientInstance<OSS> clientInstance = clientPool.getClient();
-            clientInstance.getClient().deleteObject(bucketName, objectName);
-            clientPool.returnClient(clientInstance.getIndex());
-        } else {
-            client.deleteObject(bucketName, objectName);
-        }
+        getClient().deleteObject(bucketName, objectName);
     }
 
     public void shutdown() {
-        if (enableClientPool) {
-            clientPool.shutdown();
-        } else {
-            client.shutdown();
-        }
+        clientPool.shutdown();
+        access = null;
     }
 }
