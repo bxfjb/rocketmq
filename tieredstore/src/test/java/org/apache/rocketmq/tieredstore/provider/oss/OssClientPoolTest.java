@@ -18,6 +18,8 @@
 package org.apache.rocketmq.tieredstore.provider.oss;
 
 import com.aliyuncs.exceptions.ClientException;
+import org.apache.rocketmq.tieredstore.common.TieredMessageStoreConfig;
+import org.apache.rocketmq.tieredstore.util.TieredStoreUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -26,17 +28,11 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
 
 public class OssClientPoolTest {
-    private final String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
-    private OssConfig ossConfig;
+    private final String bucketName = TieredStoreUtil.OSS_XIAOMI_CMP_TEST_BUCKET;
+    private final TieredMessageStoreConfig config = new TieredMessageStoreConfig();
     @Before
     public void setUp() throws ClientException, InterruptedException, NoSuchFieldException, IllegalAccessException {
-        ossConfig = new OssConfig(
-                OssConstant.oss_xiaomi_cmp_test_bucket,
-                OssConstant.oss_endpoint_beijing,
-                OssConstant.oss_access_key_id_value,
-                OssConstant.oss_access_key_secret_value,
-                1);
-        OssUtil.init(ossConfig);
+        OssUtil.init(config);
     }
 
     @After
@@ -45,7 +41,7 @@ public class OssClientPoolTest {
 
     @Test
     public void miCmpTest() throws ClientException, InterruptedException, InvocationTargetException, NoSuchMethodException, IllegalAccessException {
-        OssAccess access = OssAccess.getInstance(ossConfig);
+        OssAccess access = OssAccess.getInstance(config);
 
         access.shutdown();
     }
@@ -61,16 +57,16 @@ public class OssClientPoolTest {
     }
 
     public void concurrentTest(int poolSize) throws InterruptedException, ClientException {
-        ossConfig.setClientPoolSize(poolSize);
-        OssAccess access = OssAccess.getInstance(ossConfig);
+        config.setObjectStoreClientPoolNum(poolSize);
+        OssAccess access = OssAccess.getInstance(config);
         long begin, end;
         begin = System.currentTimeMillis();
         String data = poolSize + "!";
         concurrentTask(access, data, Integer.toString(poolSize));
         end = System.currentTimeMillis();
-        System.out.println(poolSize + " clients time cost: " + (end - begin) + "ms");
+        System.out.printf(poolSize + " clients time cost: " + (end - begin) + "ms\n");
         truncateAll(access, Integer.toString(poolSize));
-        access.listObjects(bucketName).forEach(ossObjectSummary -> System.out.println(ossObjectSummary.getKey()));
+        access.listObjects(bucketName).forEach(ossObjectSummary -> System.out.printf(ossObjectSummary.getKey() + "\n"));
         access.shutdown();
     }
 

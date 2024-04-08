@@ -18,21 +18,22 @@
 package org.apache.rocketmq.tieredstore.provider;
 
 import com.aliyuncs.exceptions.ClientException;
-import org.apache.rocketmq.tieredstore.exception.TieredStoreErrorCode;
-import org.apache.rocketmq.tieredstore.exception.TieredStoreException;
+import org.apache.rocketmq.tieredstore.util.TieredStoreUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 
 public abstract class TieredStoreClientPool<T> {
-    protected final ArrayList<T> clientList = new ArrayList<>();
+    protected final Logger logger = LoggerFactory.getLogger(TieredStoreUtil.TIERED_STORE_LOGGER_NAME);
+    protected final ArrayList<T> clientList;
     private final int instanceNum;
-    private AtomicInteger nextIndex;
+    private final AtomicInteger nextIndex;
     protected String endpoint;
 
     public TieredStoreClientPool(int instanceNum, String endpoint) {
+        this.clientList = new ArrayList<>();
         this.instanceNum = instanceNum;
         this.endpoint = endpoint;
         for (int i = 0;i < instanceNum;++i) {
@@ -46,7 +47,15 @@ public abstract class TieredStoreClientPool<T> {
     public abstract void shutdown();
 
     public T getClient() throws ClientException, InterruptedException {
-        return clientList.get(nextIndex.addAndGet(1) % instanceNum);
+        int current;
+        int next;
+        T result;
+        do {
+            current = nextIndex.get();
+            next = current == Integer.MAX_VALUE ? 0 : current + 1;
+            result = clientList.get(next % instanceNum);
+        } while (!nextIndex.compareAndSet(current, next));
+        return result;
     }
 
 }

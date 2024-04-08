@@ -126,6 +126,8 @@ public class TieredMessageStoreConfig {
 
     private String objectStoreSecretKey = "";
 
+    private int objectStoreClientPoolNum = 1;
+
     public static String localHostName() {
         try {
             return InetAddress.getLocalHost().getHostName();
@@ -397,5 +399,13 @@ public class TieredMessageStoreConfig {
 
     public String getObjectStoreEndpoint() {
         return objectStoreEndpoint;
+    }
+
+    public void setObjectStoreClientPoolNum(int objectStoreClientPoolNum) {
+        this.objectStoreClientPoolNum = objectStoreClientPoolNum;
+    }
+
+    public int getObjectStoreClientPoolNum() {
+        return objectStoreClientPoolNum;
     }
 }

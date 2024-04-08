@@ -20,12 +20,8 @@ package org.apache.rocketmq.tieredstore.provider.oss;
 import com.aliyun.oss.OSS;
 import com.aliyuncs.exceptions.ClientException;
 import org.apache.rocketmq.tieredstore.provider.TieredStoreClientPool;
-import org.apache.rocketmq.tieredstore.util.TieredStoreUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class OssClientPool extends TieredStoreClientPool<OSS> {
-    private final Logger logger = LoggerFactory.getLogger(TieredStoreUtil.TIERED_STORE_LOGGER_NAME);
     private boolean isShutdown = false;
 
     public OssClientPool(int instanceNum, String endpoint) {

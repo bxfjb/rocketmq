@@ -34,10 +34,9 @@ import java.nio.ByteBuffer;
 import java.util.Random;
 
 public class OssFileSegmentTest {
-    private final String bucketName = OssConstant.oss_xiaomi_cmp_test_bucket;
-    private final String endpoint = OssConstant.oss_endpoint_beijing;
-    private TieredMessageStoreConfig storeConfig;
-    private OssConfig ossConfig;
+    private final String bucketName = TieredStoreUtil.OSS_XIAOMI_CMP_TEST_BUCKET;
+    private final String endpoint = TieredStoreUtil.OSS_ENDPOINT_BEIJING;
+    private TieredMessageStoreConfig storeConfig = new TieredMessageStoreConfig();
     private MessageQueue mq;
     private OssFileSegment ossFileSegment;
 
@@ -46,14 +45,16 @@ public class OssFileSegmentTest {
         storeConfig = new TieredMessageStoreConfig();
         mq = new MessageQueue("OSSFileSegmentTestTopic1", "broker", 0);
         TieredStoreExecutor.init();
-        ossConfig = new OssConfig(bucketName, endpoint, OssConstant.oss_access_key_id_value, OssConstant.oss_access_key_secret_value, 1);
-        OssUtil.init(ossConfig);
+        storeConfig.setObjectStoreBucket(bucketName);
+        storeConfig.setObjectStoreEndpoint(endpoint);
+        storeConfig.setObjectStoreClientPoolNum(1);
+        OssUtil.init(storeConfig);
     }
 
     @Test
     public void appendAndReadTest() throws ClientException, NoSuchFieldException, IllegalAccessException, InterruptedException {
         ossFileSegment = new OssFileSegment(
-                storeConfig, ossConfig, FileSegmentType.CONSUME_QUEUE, TieredStoreUtil.toPath(mq), 0);
+                storeConfig, FileSegmentType.CONSUME_QUEUE, TieredStoreUtil.toPath(mq), 0);
         byte[] source = new byte[4096];
         new Random().nextBytes(source);
         ByteBuffer buffer = ByteBuffer.wrap(source);
@@ -76,7 +77,7 @@ public class OssFileSegmentTest {
     @Test
     public void putAndReadTest() throws ClientException, NoSuchFieldException, IllegalAccessException {
         ossFileSegment = new OssFileSegment(
-                storeConfig, ossConfig, FileSegmentType.INDEX, TieredStoreUtil.toPath(mq), 0);
+                storeConfig, FileSegmentType.INDEX, TieredStoreUtil.toPath(mq), 0);
         byte[] source = new byte[4096];
         new Random().nextBytes(source);
         ByteBuffer buffer = ByteBuffer.wrap(source);

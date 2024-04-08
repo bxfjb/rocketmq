@@ -48,6 +48,11 @@ public class TieredStoreUtil {
 
     public static final String TIERED_STORE_LOGGER_NAME = "RocketmqTieredStore";
     public static final String RMQ_SYS_TIERED_STORE_INDEX_TOPIC = "rmq_sys_INDEX";
+    public static final String OSS_ACCESS_KEY_ID_NAME = "OSS_ACCESS_KEY_ID";
+    public static final String OSS_ACCESS_KEY_SECRET_NAME = "OSS_ACCESS_KEY_SECRET";
+    public static final String OSS_ENDPOINT_BEIJING = "https://oss-cn-beijing.aliyuncs.com";
+    public static final String OSS_BUCKET_NAME_DEFAULT = "rocketmq-tiered-test";
+    public static final String OSS_XIAOMI_CMP_TEST_BUCKET = "bkt-bj-rocketmq-tiered-test-alicn";
     public final static int MSG_ID_LENGTH = 8 + 8;
 
     private static final DecimalFormat DEC_FORMAT = new DecimalFormat("#.##");

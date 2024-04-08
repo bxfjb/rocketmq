@@ -31,7 +31,6 @@ import org.apache.rocketmq.tieredstore.provider.stream.FileSegmentInputStream;
 import org.apache.rocketmq.tieredstore.util.TieredStoreUtil;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
@@ -43,19 +42,21 @@ public class OssFileSegment extends TieredFileSegment {
     private final OssAccess access;
     private int size;
 
-    // filePath: broker/topic/queueId
-    // bucketName: rocketmq-tiered-test
-    // objectName: cluster/broker/topic/queueId/fileType/baseOffset
+    /**
+     * filePath: broker/topic/queueId
+     * bucketName: rocketmq-tiered-test
+     * objectName: cluster/broker/topic/queueId/fileType/baseOffset
+     * */
     public OssFileSegment(TieredMessageStoreConfig storeConfig,
-                          OssConfig ossConfig,
-                          FileSegmentType fileType,
-                          String filePath,
-                          long baseOffset) throws ClientException, NoSuchFieldException, IllegalAccessException {
+        FileSegmentType fileType,
+        String filePath,
+        long baseOffset) throws ClientException, NoSuchFieldException, IllegalAccessException {
         super(storeConfig, fileType, filePath, baseOffset);
-        this.objectName = Paths.get("rocketmq/" + storeConfig.getBrokerClusterName(), filePath, fileType.toString(),
-                TieredStoreUtil.offset2FileName(baseOffset)).toString();
-        this.bucketName = ossConfig.getBucketName();
-        this.access = OssAccess.getInstance(ossConfig);
+        this.objectName = Paths.get(storeConfig.getTieredStoreFilePath(), storeConfig.getBrokerClusterName(),
+                filePath, fileType.toString(), TieredStoreUtil.offset2FileName(baseOffset)).toString();
+        this.bucketName = storeConfig.getObjectStoreBucket();
+        this.access = OssAccess.getInstance(storeConfig);
+        OssUtil.init(storeConfig);
     }
 
     @Override

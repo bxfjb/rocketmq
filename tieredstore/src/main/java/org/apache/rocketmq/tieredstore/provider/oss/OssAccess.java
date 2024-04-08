@@ -30,6 +30,7 @@ import com.aliyun.oss.model.ObjectListing;
 import com.aliyun.oss.model.OSSObjectSummary;
 import com.aliyun.oss.model.SimplifiedObjectMeta;
 import com.aliyuncs.exceptions.ClientException;
+import org.apache.rocketmq.tieredstore.common.TieredMessageStoreConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,18 +38,25 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Singleton class that encapsulates basic operations of OSS api
+ * */
 public class OssAccess {
-    private static OssAccess access;
+    private static volatile OssAccess access;
     private final OssClientPool clientPool;
 
-    public static OssAccess getInstance(OssConfig ossConfig) throws ClientException {
+    public static OssAccess getInstance(TieredMessageStoreConfig config) throws ClientException {
         if (access == null) {
-            access = new OssAccess(ossConfig.getClientPoolSize(), ossConfig.getEndpoint());
+            synchronized (OssAccess.class) {
+                if (access == null) {
+                    access = new OssAccess(config.getObjectStoreClientPoolNum(), config.getObjectStoreEndpoint());
+                }
+            }
         }
         return access;
     }
 
-    private OssAccess(int clientPoolSize, String endpoint) throws ClientException {
+    private OssAccess(int clientPoolSize, String endpoint) {
         clientPool = new OssClientPool(clientPoolSize, endpoint);
     }
 
@@ -115,7 +123,7 @@ public class OssAccess {
     }
 
     public AppendObjectResult appendObject(InputStream inputStream, String bucketName, String objectName)
-            throws InterruptedException, ClientException{
+            throws InterruptedException, ClientException {
         if (!isObjectExist(bucketName, objectName)) {
             return appendObject(inputStream, bucketName, objectName, 0);
         }
@@ -126,19 +134,15 @@ public class OssAccess {
     public AppendObjectResult appendObject(InputStream inputStream, String bucketName, String objectName,
             long offset) throws InterruptedException, ClientException {
         ObjectMetadata meta = new ObjectMetadata();
-        // 指定上传的内容类型。
         meta.setContentType("text/plain");
-        // 通过AppendObjectRequest设置多个参数。
         AppendObjectRequest request = new AppendObjectRequest(bucketName, objectName, inputStream ,meta);
-        // 设置文件的追加位置。
         request.setPosition(offset);
         OSS client = getClient();
         return client.appendObject(request);
     }
 
     public PutObjectResult putObject(InputStream inputStream, String bucketName,
-            String objectName) throws InterruptedException, ClientException{
-        // 创建PutObjectRequest对象。
+            String objectName) throws InterruptedException, ClientException {
         PutObjectRequest request = new PutObjectRequest(bucketName, objectName, inputStream);
         return getClient().putObject(request);
     }
@@ -150,6 +154,5 @@ public class OssAccess {
 
     public void shutdown() {
         clientPool.shutdown();
-        access = null;
     }
 }
