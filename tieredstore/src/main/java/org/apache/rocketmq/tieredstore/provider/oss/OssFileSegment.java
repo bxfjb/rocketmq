@@ -124,11 +124,10 @@ public class OssFileSegment extends TieredFileSegment {
 
     @Override
     public CompletableFuture<Boolean> commit0(FileSegmentInputStream inputStream, long position, int length, boolean append) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
         if (inputStream.getContentLength() != length) {
             logger.error("OssFileSegment commit0 failed for incorrect variable length :{}, actual length:{}", length, inputStream.getContentLength());
         }
-        TieredStoreExecutor.commitExecutor.execute(() -> {
+        return CompletableFuture.supplyAsync(() ->{
             try {
                 if (append) {
                     AppendObjectResult result = access.appendObject(inputStream, bucketName, objectName, position);
@@ -140,12 +139,12 @@ public class OssFileSegment extends TieredFileSegment {
                     PutObjectResult result = access.putObject(inputStream, bucketName, objectName);
                     size = length;
                 }
-                future.complete(true);
+                return true;
             } catch (Exception e) {
                 logger.error("OssFileSegment#commit0 Exception: ", e);
             }
-        });
-        return future;
+            return false;
+        }, TieredStoreExecutor.commitExecutor);
     }
 
     @VisibleForTesting

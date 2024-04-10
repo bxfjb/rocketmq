@@ -26,10 +26,11 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class TieredStoreClientPool<T> {
+    private final static int POSITIVE_MASK = 0x7FFFFFFF;
     protected final Logger logger = LoggerFactory.getLogger(TieredStoreUtil.TIERED_STORE_LOGGER_NAME);
     protected final ArrayList<T> clientList;
-    private final int instanceNum;
     private final AtomicInteger nextIndex;
+    private int instanceNum;
     protected String endpoint;
 
     public TieredStoreClientPool(int instanceNum, String endpoint) {
@@ -37,8 +38,12 @@ public abstract class TieredStoreClientPool<T> {
         this.instanceNum = instanceNum;
         this.endpoint = endpoint;
         for (int i = 0;i < instanceNum;++i) {
-            clientList.add(initSingleClient());
+            T client = initSingleClient();
+            if (client != null) {
+                clientList.add(client);
+            }
         }
+        this.instanceNum = clientList.size();
         this.nextIndex = new AtomicInteger(-1);
     }
 
@@ -52,7 +57,7 @@ public abstract class TieredStoreClientPool<T> {
         T result;
         do {
             current = nextIndex.get();
-            next = current == Integer.MAX_VALUE ? 0 : current + 1;
+            next = (current + 1) & POSITIVE_MASK;
             result = clientList.get(next % instanceNum);
         } while (!nextIndex.compareAndSet(current, next));
         return result;
