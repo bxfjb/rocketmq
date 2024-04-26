@@ -34,6 +34,7 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.store.DispatchRequest;
 import org.apache.rocketmq.store.MessageStore;
 import org.apache.rocketmq.store.SelectMappedBufferResult;
+import org.apache.rocketmq.store.config.BrokerRole;
 import org.apache.rocketmq.store.queue.ConsumeQueueInterface;
 import org.apache.rocketmq.store.queue.CqUnit;
 import org.apache.rocketmq.tieredstore.MessageStoreConfig;
@@ -98,6 +99,13 @@ public class MessageStoreDispatcherImpl extends ServiceThread implements Message
 
     @Override
     public void dispatch(DispatchRequest request) {
+        // Slave shouldn't dispatch
+        if (defaultStore.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE) {
+            return;
+        } else if (defaultStore.getMessageStoreConfig().isEnableDLegerCommitLog() &&
+                defaultStore.getMessageStoreConfig().getBrokerRole() == BrokerRole.ASYNC_MASTER) {
+            return;
+        }
         if (stopped || topicFilter != null && topicFilter.filterTopic(request.getTopic())) {
             return;
         }
